@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import axios from 'axios';
 import cookieParser from 'cookie-parser';
-import { doubleCsrf } from 'csrf-csrf';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -61,21 +60,6 @@ app.use(
 
 // Set cookie parser middleware
 app.use(cookieParser());
-
-// Setup CSRF protection
-const { generateToken, doubleCsrfProtection } = doubleCsrf({
-  getSecret: () =>
-    process.env.CSRF_SECRET || 'csrf-secret-key-change-in-production',
-  cookieName: '_csrf',
-  cookieOptions: {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: isProduction,
-    path: '/',
-  },
-  size: 64,
-  ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-});
 
 // Set EJS as templating engine
 app.set('view engine', 'ejs');
@@ -242,7 +226,6 @@ app.get('/logout', (req, res) => {
     // Clear auth cookies
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
-    res.clearCookie('_csrf');
     res.redirect('/login');
   });
 });
@@ -364,100 +347,87 @@ app.get('/api/callback', async (req, res) => {
   }
 });
 
-// Serve the CSRF token for client-side forms
-app.get('/api/csrf-token', (req, res) => {
-  const csrfToken = generateToken(res);
-  res.json({ csrfToken });
-});
-
 // Add token refresh endpoint - server-side implementation with token rotation
-app.post(
-  '/api/refresh-token',
-  doubleCsrfProtection,
-  tokenRequestLimiter,
-  async (req, res) => {
-    const refreshToken = req.cookies.refreshToken;
+app.post('/api/refresh-token', tokenRequestLimiter, async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
 
-    if (!refreshToken) {
-      return res.status(400).json({ message: 'Refresh token is required' });
-    }
-
-    try {
-      // Verify the refresh token structure (not using JWT_SECRET as refresh tokens are opaque)
-      let tokenId;
-      try {
-        // If your refresh tokens are JWT format, you could decode them
-        // For this example, we'll use the token itself as the ID
-        tokenId = refreshToken;
-      } catch (error) {
-        return res
-          .status(401)
-          .json({ message: 'Invalid refresh token format' });
-      }
-
-      // Check if refresh token exists and is valid
-      if (!refreshTokenStore.has(tokenId)) {
-        return res
-          .status(401)
-          .json({ message: 'Refresh token invalid or expired' });
-      }
-
-      // Get stored refresh token data
-      const storedData = refreshTokenStore.get(tokenId);
-
-      // Delete the old refresh token (rotation)
-      refreshTokenStore.delete(tokenId);
-
-      // Get new tokens
-      const refreshResponse = await refreshTokenExchange({
-        env_url: process.env.SCALEKIT_ENV_URL,
-        refresh_token: refreshToken,
-        client_id: process.env.SCALEKIT_CLIENT_ID,
-        client_secret: process.env.SCALEKIT_CLIENT_SECRET,
-      });
-
-      // Store the new refresh token
-      const newRefreshTokenId = refreshResponse.refresh_token;
-      refreshTokenStore.set(newRefreshTokenId, {
-        userId: storedData.userId,
-        createdAt: new Date(),
-      });
-
-      // Update the idToken in the session if a new one is provided
-      if (refreshResponse.id_token) {
-        req.session.idToken = refreshResponse.id_token;
-      }
-
-      // Set cookies with updated tokens
-      // Access token - accessible to JavaScript
-      res.cookie('accessToken', refreshResponse.access_token, {
-        maxAge: (refreshResponse.expires_in - 60) * 1000,
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        sameSite: 'strict',
-      });
-
-      // Refresh token - httpOnly to prevent JS access
-      res.cookie('refreshToken', refreshResponse.refresh_token, {
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        sameSite: 'strict',
-      });
-
-      // Return just the access token info (not the refresh token)
-      return res.json({
-        access_token: refreshResponse.access_token,
-        expires_in: refreshResponse.expires_in,
-      });
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      return res.status(401).json({ message: 'Failed to refresh token' });
-    }
+  if (!refreshToken) {
+    return res.status(400).json({ message: 'Refresh token is required' });
   }
-);
+
+  try {
+    // Verify the refresh token structure (not using JWT_SECRET as refresh tokens are opaque)
+    let tokenId;
+    try {
+      // If your refresh tokens are JWT format, you could decode them
+      // For this example, we'll use the token itself as the ID
+      tokenId = refreshToken;
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid refresh token format' });
+    }
+
+    // Check if refresh token exists and is valid
+    if (!refreshTokenStore.has(tokenId)) {
+      return res
+        .status(401)
+        .json({ message: 'Refresh token invalid or expired' });
+    }
+
+    // Get stored refresh token data
+    const storedData = refreshTokenStore.get(tokenId);
+
+    // Delete the old refresh token (rotation)
+    refreshTokenStore.delete(tokenId);
+
+    // Get new tokens
+    const refreshResponse = await refreshTokenExchange({
+      env_url: process.env.SCALEKIT_ENV_URL,
+      refresh_token: refreshToken,
+      client_id: process.env.SCALEKIT_CLIENT_ID,
+      client_secret: process.env.SCALEKIT_CLIENT_SECRET,
+    });
+
+    // Store the new refresh token
+    const newRefreshTokenId = refreshResponse.refresh_token;
+    refreshTokenStore.set(newRefreshTokenId, {
+      userId: storedData.userId,
+      createdAt: new Date(),
+    });
+
+    // Update the idToken in the session if a new one is provided
+    if (refreshResponse.id_token) {
+      req.session.idToken = refreshResponse.id_token;
+    }
+
+    // Set cookies with updated tokens
+    // Access token - accessible to JavaScript
+    res.cookie('accessToken', refreshResponse.access_token, {
+      maxAge: (refreshResponse.expires_in - 60) * 1000,
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'strict',
+    });
+
+    // Refresh token - httpOnly to prevent JS access
+    res.cookie('refreshToken', refreshResponse.refresh_token, {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'strict',
+    });
+
+    // Return just the access token info (not the refresh token)
+    return res.json({
+      access_token: refreshResponse.access_token,
+      expires_in: refreshResponse.expires_in,
+    });
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return res.status(401).json({ message: 'Failed to refresh token' });
+  }
+});
 
 // Add protected API endpoints
 app.get('/api/user-info', verifyToken, (req, res) => {
@@ -468,9 +438,9 @@ app.get('/api/user-info', verifyToken, (req, res) => {
   });
 });
 
-// Example of a protected POST endpoint that needs CSRF protection
-app.post('/api/user-action', verifyToken, doubleCsrfProtection, (req, res) => {
-  // This endpoint is protected both by JWT and CSRF token
+// Example of a protected POST endpoint - removed CSRF protection
+app.post('/api/user-action', verifyToken, (req, res) => {
+  // This endpoint is protected by JWT only (removed CSRF protection)
   return res.json({
     success: true,
     message: 'Action performed successfully',
