@@ -387,6 +387,8 @@ app.post('/api/refresh-token', tokenRequestLimiter, async (req, res) => {
       client_secret: process.env.SCALEKIT_CLIENT_SECRET,
     });
 
+    console.log('refreshResponse\n', JSON.stringify(refreshResponse, null, 2));
+
     // Store the new refresh token
     const newRefreshTokenId = refreshResponse.refresh_token;
     refreshTokenStore.set(newRefreshTokenId, {
