@@ -221,12 +221,37 @@ app.get('/logout', (req, res) => {
     refreshTokenStore.delete(refreshToken);
   }
 
-  // Clear session
+  // Get ID token from session if it exists, but store it in a local variable
+  // so it's available even after the session is destroyed
+  const idToken = req.session.idToken;
+
+  // Clear session first to remove all session data including the ID token
   req.session.destroy(() => {
     // Clear auth cookies
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
-    res.redirect('/login');
+
+    // Check if we had an ID token (for SSO logout)
+    if (idToken) {
+      // Define the URL that Scalekit will redirect back to after logout
+      const postLogoutRedirectUri = 'http://localhost:3000/';
+
+      // Create the logout URL
+      const logoutUrl = `${
+        process.env.SCALEKIT_ENV_URL
+      }/end_session?id_token_hint=${idToken}&post_logout_redirect_uri=${encodeURIComponent(
+        postLogoutRedirectUri
+      )}`;
+
+      console.log('Redirecting to Scalekit logout URL:', logoutUrl);
+
+      // Redirect to Scalekit logout endpoint
+      // This is a one-time redirect with the ID token, after which the token will no longer be valid
+      res.redirect(logoutUrl);
+    } else {
+      // Regular login case - redirect directly to login page
+      res.redirect('/login');
+    }
   });
 });
 
