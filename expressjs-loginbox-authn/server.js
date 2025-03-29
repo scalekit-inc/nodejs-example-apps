@@ -266,6 +266,7 @@ app.post('/sso-login', (req, res) => {
   // options['loginHint'] = email;
   // options['connectionId'] = 'conn_59615204090052747';
   options['scopes'] = ['openid', 'profile', 'email', 'offline_access'];
+  options['prompt'] = 'create';
 
   try {
     const authorizationUrl = scalekit.getAuthorizationUrl(redirectUri, options);

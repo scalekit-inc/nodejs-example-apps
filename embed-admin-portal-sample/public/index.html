@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Portal (Embed)</title>
+
+</head>
+
+<body>
+  <h1>Admin Portal (Embed)</h1>
+  <iframe id="portal-iframe" width="100%" height="600px" frameborder="0"></iframe>
+</body>
+
+<script>
+  window.onmessage = (event) => {
+    if (event.origin === 'http://localhost:3001') {
+      console.log(event.data)
+    }
+  };
+
+  // Fetch portal link data when page loads
+  async function fetchPortalLink() {
+    try {
+      const response = await fetch('/api/portal-link');
+      const data = await response.json();
+      const portalIframe = document.getElementById('portal-iframe');
+      if (portalIframe && data.link && data.link.location) {
+        portalIframe.src = data.link.location;
+      }
+    } catch (error) {
+      console.error('Error fetching portal link:', error);
+    }
+  }
+
+  fetchPortalLink();
+</script>
+
+</html>
