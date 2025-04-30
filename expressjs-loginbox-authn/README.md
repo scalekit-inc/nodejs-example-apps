@@ -6,6 +6,16 @@ A simple web application demonstrating Single Sign-On (SSO) authentication using
 
 For more screenshots, see the [screenshots folder](public/images).
 
+## Clone this folder
+
+```bash
+git clone --filter=blob:none --no-checkout git@github.com:scalekit-developers/nodejs-example-apps.git
+cd nodejs-example-apps
+git sparse-checkout init --cone
+git sparse-checkout set expressjs-loginbox-authn
+git checkout main  # or the branch you want
+```
+
 ## Features
 
 - Single Sign-On (SSO) authentication powered by Scalekit
