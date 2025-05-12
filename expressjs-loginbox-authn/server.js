@@ -109,86 +109,36 @@ const verifyToken = (req, res, next) => {
 
 // Routes
 app.get('/', (req, res) => {
-  res.redirect(req.session.user ? '/profile' : '/login');
-});
-
-app.get('/login', (req, res) => {
+  // If user is already authenticated, show profile
   if (req.session.user) {
     res.redirect('/profile');
     return;
   }
-  res.render('login', { error: null });
+  // Otherwise, render the home page with the Scalekit button
+  res.render('home', { error: null });
 });
 
-app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+// Redirect old login route to home
+app.get('/login', (req, res) => {
+  res.redirect('/');
+});
+
+// New route for direct Scalekit login
+app.get('/scalekit-login', (req, res) => {
+  const options = {
+    scopes: ['openid', 'profile', 'email', 'offline_access'],
+    prompt: 'create',
+  };
 
   try {
-    const user = users.find((user) => user.email === email);
-    const isValidPassword =
-      user && (await bcrypt.compare(password, user.password));
-
-    if (isValidPassword) {
-      // Create JWT payload
-      const tokenPayload = {
-        sub: user.id.toString(),
-        email: user.email,
-        name: user.name,
-        username: user.username || user.email,
-        role: user.role,
-      };
-
-      // Generate access token
-      const accessToken = jwt.sign(tokenPayload, JWT_SECRET, {
-        expiresIn: '1h', // 1 hour
-      });
-
-      // Generate refresh token (a random string is fine as it's stored server-side)
-      const refreshToken = jwt.sign({ type: 'refresh' }, JWT_SECRET, {
-        expiresIn: '30d', // 30 days
-      });
-
-      // Store refresh token
-      refreshTokenStore.set(refreshToken, {
-        userId: user.id,
-        createdAt: new Date(),
-      });
-
-      // Set user info in session
-      req.session.user = {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        username: user.username || user.email,
-      };
-
-      // Set cookies with tokens
-      // Access token - accessible to JavaScript
-      res.cookie('accessToken', accessToken, {
-        maxAge: (60 * 60 - 60) * 1000, // 1 hour - 60 seconds
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        sameSite: 'strict',
-      });
-
-      // Refresh token - httpOnly to prevent JS access
-      res.cookie('refreshToken', refreshToken, {
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        sameSite: 'strict',
-      });
-
-      res.redirect('/profile');
-      return;
-    }
-
-    res.render('login', { error: 'Invalid email or password' });
+    const authorizationUrl = scalekit.getAuthorizationUrl(redirectUri, options);
+    console.log('authorizationUrl', authorizationUrl, options);
+    res.redirect(authorizationUrl);
   } catch (error) {
-    console.error('Login error:', error);
-    res.render('login', { error: 'An error occurred during login' });
+    console.error('Scalekit login error:', error);
+    res.render('home', {
+      error: 'An error occurred while initiating Scalekit login',
+    });
   }
 });
 
@@ -300,40 +250,10 @@ app.get('/logout', (req, res) => {
       // This is a one-time redirect with the ID token, after which the token will no longer be valid
       res.redirect(logoutUrl);
     } else {
-      // Regular login case - redirect directly to login page
-      res.redirect('/login');
+      // Regular login case - redirect directly to home page
+      res.redirect('/');
     }
   });
-});
-
-app.get('/sso-login', (req, res) => {
-  res.render('sso-login', { error: null });
-});
-
-app.post('/sso-login', (req, res) => {
-  const { email } = req.body;
-  let [, domain] = email.split('@');
-  let options = Object.create({});
-  // options['loginHint'] = email;
-  // options['connectionId'] = 'conn_59615204090052747';
-  options['scopes'] = ['openid', 'profile', 'email', 'offline_access'];
-  options['prompt'] = 'create';
-
-  try {
-    const authorizationUrl = scalekit.getAuthorizationUrl(redirectUri, options);
-    // const authorizationUrl = initiateAuth({
-    //   env_url: process.env.SCALEKIT_ENVIRONMENT_URL,
-    //   redirect_uri: redirectUri,
-    //   scopes: options['scopes'],
-    // });
-    res.redirect(authorizationUrl);
-    console.log('authorizationUrl', authorizationUrl, options);
-  } catch (error) {
-    console.error('SSO login error:', error);
-    res.render('sso-login', {
-      error: 'An error occurred while initiating SSO login',
-    });
-  }
 });
 
 app.get('/api/callback', async (req, res) => {
@@ -342,8 +262,8 @@ app.get('/api/callback', async (req, res) => {
 
   if (error) {
     console.error('SSO callback error:', error, error_description);
-    res.render('login', {
-      error: `SSO login failed: ${error_description || error}`,
+    res.render('home', {
+      error: `Login failed: ${error_description || error}`,
     });
     return;
   }
@@ -367,7 +287,7 @@ app.get('/api/callback', async (req, res) => {
       decodedToken = jwt.decode(response.id_token);
     } catch (error) {
       console.error('Token verification error:', error);
-      res.render('login', {
+      res.render('home', {
         error: 'Invalid token received. Please try again.',
       });
       return;
@@ -418,7 +338,7 @@ app.get('/api/callback', async (req, res) => {
     res.redirect('/profile');
   } catch (error) {
     console.error('Token exchange error:', error);
-    res.render('login', {
+    res.render('home', {
       error: 'Failed to complete SSO login. Please try again.',
     });
   }
