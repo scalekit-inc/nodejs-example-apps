@@ -16,6 +16,13 @@ git sparse-checkout set expressjs-loginbox-authn
 git checkout main  # or the branch you want
 ```
 
+<details>
+<summary>More details on cloning the repo</summary>
+
+- This specifically clones the expressjs-loginbox-authn folder and not the entire repo.
+- VSCode contributors have to enable `git.openRepositoryInParentFolders` in settings.
+</details>
+
 ## Features
 
 - Single Sign-On (SSO) authentication powered by Scalekit
