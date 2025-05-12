@@ -76,7 +76,7 @@ npm run build:css
 npm run dev
 ```
 
-4. Visit http://localhost:3001 in your browser
+4. Visit http://localhost:3000 in your browser
 
 ## Demo Credentials
 
