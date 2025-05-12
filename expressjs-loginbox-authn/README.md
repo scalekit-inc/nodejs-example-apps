@@ -80,7 +80,7 @@ npm run dev
 
 ## Demo Credentials
 
-- Username: demo
+- Email: demo@example.com
 - Password: demo123
 
 ## Technologies Used

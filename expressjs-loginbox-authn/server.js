@@ -129,7 +129,58 @@ app.post('/login', async (req, res) => {
       user && (await bcrypt.compare(password, user.password));
 
     if (isValidPassword) {
-      req.session.user = { id: user.id, email: user.email };
+      // Create JWT payload
+      const tokenPayload = {
+        sub: user.id.toString(),
+        email: user.email,
+        name: user.name,
+        username: user.username || user.email,
+        role: user.role,
+      };
+
+      // Generate access token
+      const accessToken = jwt.sign(tokenPayload, JWT_SECRET, {
+        expiresIn: '1h', // 1 hour
+      });
+
+      // Generate refresh token (a random string is fine as it's stored server-side)
+      const refreshToken = jwt.sign({ type: 'refresh' }, JWT_SECRET, {
+        expiresIn: '30d', // 30 days
+      });
+
+      // Store refresh token
+      refreshTokenStore.set(refreshToken, {
+        userId: user.id,
+        createdAt: new Date(),
+      });
+
+      // Set user info in session
+      req.session.user = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        username: user.username || user.email,
+      };
+
+      // Set cookies with tokens
+      // Access token - accessible to JavaScript
+      res.cookie('accessToken', accessToken, {
+        maxAge: (60 * 60 - 60) * 1000, // 1 hour - 60 seconds
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        sameSite: 'strict',
+      });
+
+      // Refresh token - httpOnly to prevent JS access
+      res.cookie('refreshToken', refreshToken, {
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        sameSite: 'strict',
+      });
+
       res.redirect('/profile');
       return;
     }
