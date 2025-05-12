@@ -27,7 +27,7 @@ const app = express();
 const redirectUri = 'http://localhost:3000/api/callback';
 
 const scalekit = new Scalekit(
-  process.env.SCALEKIT_ENV_URL,
+  process.env.SCALEKIT_ENVIRONMENT_URL,
   process.env.SCALEKIT_CLIENT_ID,
   process.env.SCALEKIT_CLIENT_SECRET
 );
@@ -238,7 +238,7 @@ app.get('/logout', (req, res) => {
 
       // Create the logout URL
       const logoutUrl = `${
-        process.env.SCALEKIT_ENV_URL
+        process.env.SCALEKIT_ENVIRONMENT_URL
       }/end_session?id_token_hint=${idToken}&post_logout_redirect_uri=${encodeURIComponent(
         postLogoutRedirectUri
       )}`;
@@ -271,7 +271,7 @@ app.post('/sso-login', (req, res) => {
   try {
     const authorizationUrl = scalekit.getAuthorizationUrl(redirectUri, options);
     // const authorizationUrl = initiateAuth({
-    //   env_url: process.env.SCALEKIT_ENV_URL,
+    //   env_url: process.env.SCALEKIT_ENVIRONMENT_URL,
     //   redirect_uri: redirectUri,
     //   scopes: options['scopes'],
     // });
@@ -300,7 +300,7 @@ app.get('/api/callback', async (req, res) => {
   try {
     console.log('requesting scalekit to exchange oauth code for token', code);
     const response = await exchangeCodeForToken({
-      env_url: process.env.SCALEKIT_ENV_URL,
+      env_url: process.env.SCALEKIT_ENVIRONMENT_URL,
       code,
       redirect_uri: redirectUri,
       client_id: process.env.SCALEKIT_CLIENT_ID,
@@ -407,7 +407,7 @@ app.post('/api/refresh-token', tokenRequestLimiter, async (req, res) => {
 
     // Get new tokens
     const refreshResponse = await refreshTokenExchange({
-      env_url: process.env.SCALEKIT_ENV_URL,
+      env_url: process.env.SCALEKIT_ENVIRONMENT_URL,
       refresh_token: refreshToken,
       client_id: process.env.SCALEKIT_CLIENT_ID,
       client_secret: process.env.SCALEKIT_CLIENT_SECRET,
