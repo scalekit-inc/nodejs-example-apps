@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import axios from 'axios';
 import cookieParser from 'cookie-parser';
+import { validateEnvironmentVariables } from './utils/utilities.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,13 +27,7 @@ const app = express();
 
 const redirectUri = 'http://localhost:3000/api/callback';
 
-const scalekit = new Scalekit(
-  process.env.SCALEKIT_ENVIRONMENT_URL,
-  process.env.SCALEKIT_CLIENT_ID,
-  process.env.SCALEKIT_CLIENT_SECRET
-);
-
-console.log('ScaleKit initialized successfully');
+const scalekit = validateEnvironmentVariables();
 
 // Mock user data (replace with database in production)
 const users = [
