@@ -265,21 +265,22 @@ app.get('/api/callback', async (req, res) => {
 
   try {
     console.log('requesting scalekit to exchange oauth code for token', code);
-    const response = await exchangeCodeForToken({
-      env_url: process.env.SCALEKIT_ENVIRONMENT_URL,
-      code,
-      redirect_uri: redirectUri,
-      client_id: process.env.SCALEKIT_CLIENT_ID,
-      client_secret: process.env.SCALEKIT_CLIENT_SECRET,
-    });
+    const response = await scalekit.authenticateWithCode(code, redirectUri);
 
-    console.log('user claims', response);
+    // const backupResponse = await exchangeCodeForToken({
+    //   env_url: process.env.SCALEKIT_ENVIRONMENT_URL,
+    //   code,
+    //   redirect_uri: redirectUri,
+    //   client_id: process.env.SCALEKIT_CLIENT_ID,
+    //   client_secret: process.env.SCALEKIT_CLIENT_SECRET,
+    // });
+
+    console.log('user claims by sdk:\n', JSON.stringify(response, null, 2));
 
     // Get user info from properly verified token
     let decodedToken;
     try {
-      // Note: In a real system, you'd verify this with the auth provider's public key
-      decodedToken = jwt.decode(response.id_token);
+      decodedToken = jwt.decode(response.idToken);
     } catch (error) {
       console.error('Token verification error:', error);
       res.render('home', {
@@ -430,6 +431,11 @@ app.get('/api/user-info', verifyToken, (req, res) => {
     user: req.user,
     message: 'This is protected data',
   });
+});
+
+// Add dashboard endpoint
+app.get('/dashboard', (req, res) => {
+  res.json({ status: 'ok', message: 'Dashboard endpoint is working' });
 });
 
 // Example of a protected POST endpoint - removed CSRF protection
