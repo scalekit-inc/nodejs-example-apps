@@ -10,7 +10,7 @@
     "build:css": "tailwindcss -i ./public/css/input.css -o ./public/css/output.css"
   },
   "dependencies": {
-    "@scalekit-sdk/node": "^1.0.8",
+    "@scalekit-sdk/node": "file:/Users/saif/Projects/SDKs/scalekit-sdk-node",
     "axios": "^1.8.4",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
