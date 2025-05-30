@@ -76,7 +76,7 @@ const tokenRequestLimiter = (req, res, next) => {
 };
 
 // Create middleware to verify JWT token
-const verifyToken = (req, res, next) => {
+const verifyToken = async (req, res, next) => {
   // Get token from Authorization header or cookie
   const authHeader = req.headers.authorization;
   const token = authHeader ? authHeader.split(' ')[1] : req.cookies.accessToken;
@@ -86,18 +86,12 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    // Properly verify token signature
-    const decoded = jwt.verify(token, JWT_SECRET);
-
+    // Use Scalekit SDK to validate the token
+    const decoded = await scalekit.validateAccessToken(token);
     req.user = decoded;
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
-
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Token expired' });
-    }
-
+    console.error('Token validation error:', error);
     return res.status(401).json({ message: 'Invalid token' });
   }
 };
@@ -303,10 +297,10 @@ app.get('/api/callback', async (req, res) => {
     };
 
     // Store idToken separately in session
-    req.session.idToken = response.id_token;
+    req.session.idToken = response.idToken;
 
     // Store refresh token in server-side storage
-    const refreshTokenId = response.refresh_token;
+    const refreshTokenId = response.refreshToken;
     refreshTokenStore.set(refreshTokenId, {
       userId: decodedToken.sub,
       createdAt: new Date(),
@@ -314,16 +308,19 @@ app.get('/api/callback', async (req, res) => {
 
     // Set cookies with tokens for client-side access
     // Access token - accessible to JavaScript
-    res.cookie('accessToken', response.access_token, {
-      maxAge: (response.expires_in - 60) * 1000,
-      httpOnly: false,
+    // const encryptedAccessToken = scalekit.encrypt(response.accessToken, password);
+    const encryptedAccessToken = response.accessToken;
+
+    res.cookie('accessToken', encryptedAccessToken, {
+      maxAge: (response.expiresIn || 3600) * 1000, // Default to 1 hour if expiresIn is not provided
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       sameSite: 'strict',
     });
 
     // Refresh token - httpOnly to prevent JS access
-    res.cookie('refreshToken', response.refresh_token, {
+    res.cookie('refreshToken', response.refreshToken, {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -349,63 +346,33 @@ app.post('/api/refresh-token', tokenRequestLimiter, async (req, res) => {
   }
 
   try {
-    // Verify the refresh token structure (not using JWT_SECRET as refresh tokens are opaque)
-    let tokenId;
-    try {
-      // If your refresh tokens are JWT format, you could decode them
-      // For this example, we'll use the token itself as the ID
-      tokenId = refreshToken;
-    } catch (error) {
-      return res.status(401).json({ message: 'Invalid refresh token format' });
-    }
-
-    // Check if refresh token exists and is valid
-    if (!refreshTokenStore.has(tokenId)) {
-      return res
-        .status(401)
-        .json({ message: 'Refresh token invalid or expired' });
-    }
-
-    // Get stored refresh token data
-    const storedData = refreshTokenStore.get(tokenId);
-
-    // Delete the old refresh token (rotation)
-    refreshTokenStore.delete(tokenId);
-
-    // Get new tokens
-    const refreshResponse = await refreshTokenExchange({
-      env_url: process.env.SCALEKIT_ENVIRONMENT_URL,
-      refresh_token: refreshToken,
-      client_id: process.env.SCALEKIT_CLIENT_ID,
-      client_secret: process.env.SCALEKIT_CLIENT_SECRET,
-    });
-
-    console.log('refreshResponse\n', JSON.stringify(refreshResponse, null, 2));
+    // Use Scalekit SDK to refresh the token
+    const response = await scalekit.refreshToken(refreshToken);
 
     // Store the new refresh token
-    const newRefreshTokenId = refreshResponse.refresh_token;
+    const newRefreshTokenId = response.refreshToken;
     refreshTokenStore.set(newRefreshTokenId, {
-      userId: storedData.userId,
+      userId: req.user?.sub,
       createdAt: new Date(),
     });
 
     // Update the idToken in the session if a new one is provided
-    if (refreshResponse.id_token) {
-      req.session.idToken = refreshResponse.id_token;
+    if (response.idToken) {
+      req.session.idToken = response.idToken;
     }
 
     // Set cookies with updated tokens
-    // Access token - accessible to JavaScript
-    res.cookie('accessToken', refreshResponse.access_token, {
-      maxAge: (refreshResponse.expires_in - 60) * 1000,
-      httpOnly: false,
+    // Access token - httpOnly for security
+    res.cookie('accessToken', response.accessToken, {
+      maxAge: (response.expiresIn || 3600) * 1000,
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       sameSite: 'strict',
     });
 
     // Refresh token - httpOnly to prevent JS access
-    res.cookie('refreshToken', refreshResponse.refresh_token, {
+    res.cookie('refreshToken', response.refreshToken, {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -415,8 +382,8 @@ app.post('/api/refresh-token', tokenRequestLimiter, async (req, res) => {
 
     // Return just the access token info (not the refresh token)
     return res.json({
-      access_token: refreshResponse.access_token,
-      expires_in: refreshResponse.expires_in,
+      access_token: response.accessToken,
+      expires_in: response.expiresIn,
     });
   } catch (error) {
     console.error('Error refreshing token:', error);
