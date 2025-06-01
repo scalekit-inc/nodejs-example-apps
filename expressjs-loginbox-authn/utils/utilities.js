@@ -39,3 +39,28 @@ export function validateEnvironmentVariables() {
     process.exit(1);
   }
 }
+
+testPasswordless();
+
+async function testPasswordless() {
+  let scalekit = new Scalekit(
+    process.env.SCALEKIT_ENVIRONMENT_URL,
+    process.env.SCALEKIT_CLIENT_ID,
+    process.env.SCALEKIT_CLIENT_SECRET
+  );
+
+  try {
+    let res = await scalekit.passwordless.sendPasswordlessEmail(
+      'saifshine7@gmail.com',
+      {
+        template: 'SIGNIN',
+        state: '1234567890',
+        expiresIn: 100,
+      }
+    );
+
+    console.log(res);
+  } catch (error) {
+    console.error('❌ Error sending passwordless email:', error);
+  }
+}
