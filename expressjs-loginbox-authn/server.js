@@ -227,11 +227,16 @@ app.get('/logout', (req, res) => {
       const postLogoutRedirectUri = 'http://localhost:3000/';
 
       // Create the logout URL
-      const logoutUrl = `${
-        process.env.SCALEKIT_ENVIRONMENT_URL
-      }/end_session?id_token_hint=${idToken}&post_logout_redirect_uri=${encodeURIComponent(
-        postLogoutRedirectUri
-      )}`;
+      // const logoutUrl = `${
+      //   process.env.SCALEKIT_ENVIRONMENT_URL
+      // }/end_session?id_token_hint=${idToken}&post_logout_redirect_uri=${encodeURIComponent(
+      //   postLogoutRedirectUri
+      // )}`;
+
+      const logoutUrl = scalekit.getLogoutUrl({
+        idTokenHint: idToken,
+        postLogoutRedirectUri: postLogoutRedirectUri,
+      });
 
       console.log('Redirecting to Scalekit logout URL:', logoutUrl);
 
