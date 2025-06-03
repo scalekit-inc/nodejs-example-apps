@@ -40,15 +40,15 @@ export function validateEnvironmentVariables() {
   }
 }
 
-testPasswordless();
+let scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+
+verifyPasswordlessEmail();
 
 async function testPasswordless() {
-  let scalekit = new Scalekit(
-    process.env.SCALEKIT_ENVIRONMENT_URL,
-    process.env.SCALEKIT_CLIENT_ID,
-    process.env.SCALEKIT_CLIENT_SECRET
-  );
-
   try {
     let res = await scalekit.passwordless.sendPasswordlessEmail(
       'saifshine7@gmail.com',
@@ -56,6 +56,7 @@ async function testPasswordless() {
         template: 'SIGNIN',
         state: '1234567890',
         expiresIn: 100,
+        magic
       }
     );
 
@@ -63,4 +64,22 @@ async function testPasswordless() {
   } catch (error) {
     console.error('❌ Error sending passwordless email:', error);
   }
+}
+
+async function resendPasswordlessEmail() {
+  let response = await scalekit.passwordless.resendPasswordlessEmail(
+    authRequestId
+  );
+
+  console.log(response);
+}
+
+async function verifyPasswordlessEmail() {
+  let response = await scalekit.passwordless.verifyPasswordlessEmail(
+    'nynDqEx2vM8RWjT0-4sYa5ZJd1vs07dSJ3Hnhn6vnvSRTsTE_A',
+    {
+      code: '618058',
+    }
+  );
+  console.log(response);
 }
