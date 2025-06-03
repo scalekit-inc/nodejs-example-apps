@@ -112,6 +112,23 @@ app.get('/login', (req, res) => {
   res.redirect('/');
 });
 
+// Passwordless login page
+app.get('/passwordless', (req, res) => {
+  res.render('passwordless', { error: null, success: null });
+});
+
+// Passwordless verification page
+app.get('/passwordless/verify-page', (req, res) => {
+  const { authRequestId, email, passwordlessType } = req.query;
+  res.render('passwordless-verify', {
+    authRequestId,
+    email,
+    passwordlessType,
+    error: null,
+    success: null,
+  });
+});
+
 // New route for direct Scalekit login
 app.get('/scalekit-login', (req, res) => {
   const options = {
@@ -412,6 +429,164 @@ app.post('/api/user-action', verifyToken, (req, res) => {
     success: true,
     message: 'Action performed successfully',
   });
+});
+
+// Passwordless authentication endpoints
+
+// Send passwordless email (magic link or OTP)
+app.post('/passwordless/send', async (req, res) => {
+  const { email, template = 'SIGNIN', expiresIn = 3600, state } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      error: 'Email is required',
+    });
+  }
+
+  try {
+    const options = {
+      template,
+      expiresIn,
+      magiclinkAuthUri: 'http://localhost:3000/passwordless/verify',
+    };
+
+    const sendResponse = await scalekit.passwordless.sendPasswordlessEmail(
+      email,
+      options
+    );
+
+    console.log('Passwordless email sent:', sendResponse);
+
+    return res.json({
+      success: true,
+      message: 'Verification email sent successfully',
+      authRequestId: sendResponse.authRequestId,
+      expiresIn: sendResponse.expiresIn,
+      passwordlessType: sendResponse.passwordlessType,
+    });
+  } catch (error) {
+    console.error('❌ Error sending passwordless email:', error);
+    return res.status(500).json({
+      error: 'Failed to send verification email. Please try again.',
+    });
+  }
+});
+
+// Resend passwordless email
+app.post('/passwordless/resend', async (req, res) => {
+  const { authRequestId } = req.body;
+
+  if (!authRequestId) {
+    return res.status(400).json({
+      error: 'authRequestId is required',
+    });
+  }
+
+  try {
+    const resendResponse = await scalekit.passwordless.resendPasswordlessEmail(
+      authRequestId
+    );
+
+    console.log('Passwordless email resent:', resendResponse);
+
+    return res.json({
+      success: true,
+      message: 'Verification email resent successfully',
+      authRequestId: resendResponse.authRequestId,
+      expiresIn: resendResponse.expiresIn,
+      passwordlessType: resendResponse.passwordlessType,
+    });
+  } catch (error) {
+    console.error('❌ Error resending passwordless email:', error);
+    return res.status(500).json({
+      error: 'Failed to resend verification email. Please try again.',
+    });
+  }
+});
+
+// Verify passwordless OTP code
+app.post('/passwordless/verify-code', async (req, res) => {
+  const { code, authRequestId } = req.body;
+
+  if (!code || !authRequestId) {
+    return res.status(400).json({
+      error: 'Both code and authRequestId are required',
+    });
+  }
+
+  try {
+    const verifyResponse = await scalekit.passwordless.verifyPasswordlessEmail(
+      { code },
+      authRequestId
+    );
+
+    // Set session user info
+    req.session.user = {
+      email: verifyResponse.email,
+      name: verifyResponse.email, // Use email as name if no name provided
+      username: verifyResponse.email,
+    };
+
+    // Set passwordless flag
+    req.session.passwordless = true;
+
+    console.log('Passwordless OTP verified:', verifyResponse);
+
+    return res.json({
+      success: true,
+      message: 'Code verified successfully',
+      user: {
+        email: verifyResponse.email,
+        template: verifyResponse.template,
+        passwordlessType: verifyResponse.passwordlessType,
+      },
+      redirectUrl: '/dashboard',
+    });
+  } catch (error) {
+    console.error('❌ Error verifying passwordless code:', error);
+    return res.status(400).json({
+      error:
+        'The verification code is invalid or has expired. Please request a new code.',
+    });
+  }
+});
+
+// Passwordless magic link verification endpoint
+app.get('/passwordless/verify', async (req, res) => {
+  const { link_token } = req.query;
+
+  if (!link_token) {
+    return res.status(400).json({
+      error: 'Missing link_token in query parameters.',
+    });
+  }
+
+  try {
+    // Verify the magic link token with Scalekit
+    const verifyResponse = await scalekit.passwordless.verifyPasswordlessEmail({
+      linkToken: link_token,
+    });
+
+    // Set session user info (minimal, as magic link may not return idToken)
+    req.session.user = {
+      email: verifyResponse.email,
+      name: verifyResponse.name || verifyResponse.email,
+      username: verifyResponse.email,
+      // You can add more fields if available in verifyResponse
+    };
+
+    // Optionally, you could set a flag or additional info in session
+    req.session.passwordless = true;
+
+    // Redirect to dashboard
+    return res.redirect('/dashboard');
+  } catch (error) {
+    console.error('❌ Error verifying magic link:', error);
+    return res.status(400).json({
+      error:
+        'The magic link is invalid or has expired. Please request a new verification link.',
+    });
+  }
 });
 
 async function exchangeCodeForToken({
