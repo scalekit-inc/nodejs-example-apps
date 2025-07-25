@@ -27,7 +27,89 @@ const app = express();
 
 const redirectUri = 'http://localhost:3000/api/callback';
 
-const scalekit = validateEnvironmentVariables();
+// Initialize Scalekit with error handling
+let scalekit;
+try {
+  scalekit = validateEnvironmentVariables();
+} catch (error) {
+  console.error('Failed to initialize Scalekit:', error.message);
+  process.exit(1);
+}
+
+// Global error handler for uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('\n🚨 Uncaught Exception:');
+  console.error('Error:', error.message);
+
+  // Handle specific Scalekit SDK errors
+  if (error.response && error.response.status === 401) {
+    const errorData = error.response.data;
+    if (errorData && errorData.error === 'invalid_client') {
+      console.error('\n❌ Authentication Error: Invalid Client Credentials');
+      console.error('\nThis error occurs when:');
+      console.error(
+        '1. Your SCALEKIT_CLIENT_ID or SCALEKIT_CLIENT_SECRET is incorrect'
+      );
+      console.error('2. Your Scalekit application is not properly configured');
+      console.error("3. You're using credentials from a different environment");
+      console.error('\nTo fix this:');
+      console.error('1. Check your .env file has the correct credentials');
+      console.error('2. Verify your credentials in the Scalekit dashboard');
+      console.error(
+        "3. Ensure you're using the right environment (dev/staging/prod)"
+      );
+      console.error('\nCurrent configuration:');
+      console.error(`   Environment: ${process.env.SCALEKIT_ENVIRONMENT_URL}`);
+      console.error(`   Client ID: ${process.env.SCALEKIT_CLIENT_ID}`);
+      console.error(
+        `   Client Secret: ${
+          process.env.SCALEKIT_CLIENT_SECRET
+            ? '***' + process.env.SCALEKIT_CLIENT_SECRET.slice(-4)
+            : 'NOT SET'
+        }`
+      );
+    } else {
+      console.error('\n❌ Authentication Error: Unauthorized');
+      console.error('Response data:', errorData);
+    }
+  } else if (error.code === 'ENOTFOUND') {
+    console.error('\n❌ Network Error: Could not reach Scalekit service');
+    console.error(
+      'Please check your internet connection and SCALEKIT_ENVIRONMENT_URL'
+    );
+  } else if (error.code === 'ECONNREFUSED') {
+    console.error('\n❌ Connection Error: Scalekit service is not responding');
+    console.error(
+      'Please try again later or check if the service is available'
+    );
+  } else {
+    console.error('\n❌ Unexpected Error:');
+    console.error('Stack trace:', error.stack);
+  }
+
+  console.error('\n💡 For help, visit: https://docs.scalekit.com');
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('\n🚨 Unhandled Promise Rejection:');
+  console.error('Promise:', promise);
+  console.error('Reason:', reason);
+
+  // Handle Scalekit SDK promise rejections
+  if (reason && reason.response && reason.response.status === 401) {
+    const errorData = reason.response.data;
+    if (errorData && errorData.error === 'invalid_client') {
+      console.error('\n❌ Authentication Error: Invalid Client Credentials');
+      console.error(
+        'Please check your Scalekit configuration in the .env file'
+      );
+    }
+  }
+
+  process.exit(1);
+});
 
 // Mock user data (replace with database in production)
 const users = [
@@ -352,7 +434,7 @@ app.post('/api/refresh-token', tokenRequestLimiter, async (req, res) => {
 
   try {
     // Use Scalekit SDK to refresh the token
-    const response = await scalekit.refreshToken(refreshToken);
+    const response = await scalekit.refreshAccessToken(refreshToken);
 
     // Store the new refresh token
     const newRefreshTokenId = response.refreshToken;
@@ -408,6 +490,49 @@ app.get('/api/user-info', verifyToken, (req, res) => {
 // Add dashboard endpoint
 app.get('/dashboard', (req, res) => {
   res.json({ status: 'ok', message: 'Dashboard endpoint is working' });
+});
+
+// Test endpoint to verify Scalekit configuration
+app.get('/api/test-config', async (req, res) => {
+  try {
+    // Test basic configuration
+    const config = {
+      environment: process.env.SCALEKIT_ENVIRONMENT_URL,
+      clientId: process.env.SCALEKIT_CLIENT_ID,
+      clientSecret: process.env.SCALEKIT_CLIENT_SECRET
+        ? '***' + process.env.SCALEKIT_CLIENT_SECRET.slice(-4)
+        : 'NOT SET',
+      redirectUri: redirectUri,
+    };
+
+    // Test if we can create a basic authorization URL (this doesn't make API calls)
+    try {
+      const authUrl = scalekit.getAuthorizationUrl(redirectUri, {
+        scopes: ['openid', 'profile', 'email'],
+      });
+
+      res.json({
+        status: 'success',
+        message: 'Scalekit configuration appears valid',
+        config: config,
+        authUrl: authUrl,
+        note: 'This only tests URL generation, not actual API connectivity',
+      });
+    } catch (urlError) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Failed to generate authorization URL',
+        error: urlError.message,
+        config: config,
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Configuration test failed',
+      error: error.message,
+    });
+  }
 });
 
 // Example of a protected POST endpoint - removed CSRF protection
