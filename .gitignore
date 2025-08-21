@@ -36,4 +36,6 @@ tmp/
 temp/
 
 # Debug
-.debug/
+
+# Environment files
+sso-migration-express-example/.env.example
