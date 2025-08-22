@@ -267,6 +267,7 @@ app.post('/sso-login', (req, res) => {
       console.log(
         `Using WorkOS for domain: ${domain}, organization: ${workosOrg.label}`
       );
+      console.log('WorkOS Authorization URL:', authorizationUrl);
       res.redirect(authorizationUrl);
     } catch (error) {
       console.error('WorkOS SSO login error:', error);
@@ -279,7 +280,8 @@ app.post('/sso-login', (req, res) => {
     let options = Object.create({});
     options['loginHint'] = email;
     options['domain'] = domain; // Add domain parameter for Scalekit
-    options['organizationId'] = 'org_86863029123154451';
+    // Remove organizationId and use domain-based discovery instead
+    // options['organizationId'] = 'org_86863029123154451';c
 
     try {
       const authorizationUrl = scalekit.getAuthorizationUrl(
