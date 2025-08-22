@@ -218,6 +218,40 @@ app.post('/sso-login', (req, res) => {
   const { email } = req.body;
   let [, domain] = email.split('@');
 
+  // Check for force Scalekit header
+  const forceScalekitHeader =
+    req.headers['x-force-sk-route'] || req.headers['X-Force-Sk-Route'];
+  const shouldForceScalekit =
+    forceScalekitHeader && forceScalekitHeader.toLowerCase() === 'yes';
+
+  // If force Scalekit header is set to "yes", always use Scalekit
+  if (shouldForceScalekit) {
+    let options = Object.create({});
+    options['loginHint'] = email;
+    options['domain'] = domain; // Add domain parameter for Scalekit
+    // Remove organizationId and use domain-based discovery instead
+    // options['organizationId'] = 'org_86863029123154451';
+
+    try {
+      const authorizationUrl = scalekit.getAuthorizationUrl(
+        redirectUri,
+        options
+      );
+      console.log(
+        `Force using Scalekit for domain: ${domain} (header override)`
+      );
+      console.log('Scalekit Authorization URL:', authorizationUrl);
+      res.redirect(authorizationUrl);
+      return;
+    } catch (error) {
+      console.error('Scalekit SSO login error:', error);
+      res.render('sso-login', {
+        error: 'An error occurred while initiating Scalekit SSO login',
+      });
+      return;
+    }
+  }
+
   // Check if the domain belongs to an organization that uses WorkOS
   const workosOrg = orgsOfWorkos.find((org) => org.domain === domain);
 
@@ -244,6 +278,8 @@ app.post('/sso-login', (req, res) => {
     // Use Scalekit for other domains
     let options = Object.create({});
     options['loginHint'] = email;
+    options['domain'] = domain; // Add domain parameter for Scalekit
+    options['organizationId'] = 'org_86863029123154451';
 
     try {
       const authorizationUrl = scalekit.getAuthorizationUrl(
