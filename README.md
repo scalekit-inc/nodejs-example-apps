@@ -87,10 +87,11 @@ We welcome contributions! Please follow these guidelines:
 ## Additional Resources
 
 - 📚 [Scalekit Documentation](https://docs.scalekit.com)
-- 🔧 [API Reference](https://docs.scalekit.com/apis)
-- 💬 [Community Support](https://github.com/scalekit-inc/scalekit-sdk-node-js/discussions)
-- 🎯 [Get Started Guide](https://docs.scalekit.com/quick-start-guide)
-- ⚡ [Node.js Integration Guide](https://docs.scalekit.com/integrations/nodejs)
+- 🔧 [API Reference](https://docs.scalekit.com/apis/)
+- 🚀 [Full Stack Auth Quickstart](https://docs.scalekit.com/fsa/quickstart/)
+- 🔗 [SSO Integration Guide](https://docs.scalekit.com/sso/quickstart/)
+- 💬 [Community Examples](https://github.com/orgs/scalekit-developers/repositories)
+- ⚡ [Node.js SDK](https://github.com/scalekit-inc/scalekit-sdk-node)
 
 ## Support
 
