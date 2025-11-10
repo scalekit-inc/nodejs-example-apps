@@ -180,7 +180,9 @@ app.get('/callback', async (req, res) => {
     // Get tokens from ScaleKit
     const response = await scalekit.authenticateWithCode(code, redirectUri);
     console.log(`response`, response);
-    const { user, idToken } = response;
+    const { user, idToken, accessToken } = response;
+    let userInfoPostValidation = await scalekit.validateToken(accessToken);
+    // console.log(`userInfoPostValidation`, userInfoPostValidation);
     // Store user info in session
     req.session.user = {
       id: user.id,
