@@ -10,7 +10,7 @@
     "build:css": "tailwindcss -i ./public/css/input.css -o ./public/css/output.css --watch"
   },
   "dependencies": {
-    "@scalekit-sdk/node": "^1.0.14",
+    "@scalekit-sdk/node": "^2.11.0",
     "@workos-inc/node": "^7.68.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.6.1",
