@@ -11,7 +11,9 @@
 </h1>
 
 <p align="center">
-  <strong>Auth stack for AI apps ⚡ Human auth capabilities</strong>
+  <strong>Human auth capabilities</strong>
+
+Scalekit provides auth and actions on behalf of users, with 500+ connectors and 20,000+ tools.
 </p>
 
 <p align="center">
